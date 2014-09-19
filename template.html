@@ -1,0 +1,299 @@
+<html>
+	<head>
+		<title>[filename] - results</title>
+		<link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.11.1/themes/smoothness/jquery-ui.css" />
+		<script src="http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+		<script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.11.1/jquery-ui.min.js"></script>
+
+		<style>
+			body {
+				font-size: 12px;
+				font-family: Andale Mono, monospace;
+				margin: 0;
+				padding: 0;
+			}
+			
+			.viable {
+				color: black;
+			}
+			
+			.popout {
+				position: absolute;
+				top: -2px;
+				left: -6;
+				color: black;
+				border: 2px solid black;
+				border-radius: 17px;
+				padding: 0px 4px;
+				background-color: white;
+			}
+
+			#word-list-holder {
+				overflow: scroll;
+				border-right: 1px solid black;
+				width: 200px;
+				position: fixed;
+				height: 100%;
+				z-index: 100;
+				margin: 0px;
+				padding: 0px;
+				top: 0px;
+				left: 0px;
+				background-color: white;
+			}
+			
+			span.hilit {
+				position: relative;
+				display: inline-block;
+			}
+
+			#word-list {
+				margin: 0px;
+			}
+			
+			#settings {
+				height: 30px;
+				width: 100%;
+				position: fixed;
+				border-bottom: 1px solid black;
+				padding: 0 0 0 220px;
+				margin: 0;
+				top: 0;
+				left: 0;
+				background-color: white;
+			}
+			
+			#word-list li span.loc {
+				margin-left: 5px;
+				background-color: #ccc;
+				color: white;
+				font-size: 80%;
+				padding-left: 2px;
+				padding-right: 2px;
+				border-radius: 5px;
+				cursor: pointer;
+			}
+			
+			#width-slider {
+				width: 100%;
+				margin-top: 3px;
+				margin-bottom: 3px;
+			}
+			
+			#crossword-holder {
+				color: #ddd;
+				padding-left: 220px;
+				padding-top: 40px;
+			}
+			
+			#crossword {
+				margin: 0;
+				padding: 0;
+				list-style: none;
+			}
+			
+			canvas#lines {
+				position: absolute;
+				top: 40px;
+				left: 220px;
+				width: 2000;
+				height: 2000;
+			}
+			
+			label {
+				margin-left: 50px;
+			}
+		</style>
+	</head>
+	
+	<body>
+		<div id="word-list-holder">
+		</div>
+		<div id="settings">
+			<label for="width">Width:</label> <input type="text" id="width" value="100" name="width">
+			<label for="offset">Offset:</label> <input type="text" id="offset" value="0" name="offset">
+			<button id="update">Update</button>
+		</div>
+		<div id="crossword-holder">
+		</div>
+	</body>
+	
+	<script>
+		var Crosser = {
+			clicked_words: {},
+			colors: [ '#00aba9', '#ff0097', '#a200ff', '#1ba1e2', '#f09609', 'brown' ],
+			selected: {},
+			
+			init: function() {
+				this.draw_word_list();
+				$( '#update' ).click( function() {
+					Crosser.draw_crossword();
+				} );
+				this.draw_crossword();
+				
+				$( document ).on( 'keydown', 'input', function( ev ) {
+					if ( ev.which == 13 ) {
+						Crosser.draw_crossword();
+					}
+				} );
+			},
+			
+			draw_word_list: function() {
+				var word_list = $( '<ul id="word-list">' );
+				var loc_key = 0;
+			
+				var keys = Object.keys( this.words );
+				keys = keys.sort(function(a, b) { if ( b.length != a.length ) return b.length - a.length; if ( b < a ) return 1; if ( b > a ) return -1; return 0; });
+				for ( var i = 0; i < keys.length; i++ ) {
+					var text = keys[i];
+					var locations = this.words[text];
+					
+					var word = $( '<li>' ).html( text );
+					
+					for ( var j = 0; j < locations.length; j++ ) {
+						var loc = $( '<span class="loc">' ).html( j + 1 );
+						loc.data( 'key', loc_key++ );
+						loc.data( 'loc', locations[j] );
+						loc.click( function() {
+							var lk = $( this ).data( 'key' );
+							if ( Crosser.selected.hasOwnProperty( lk ) ) {
+								delete Crosser.selected[lk];
+								$( this ).css( 'background-color', '' );
+							} else {
+								Crosser.selected[lk] = $( this ).data( 'loc' );
+								$( this ).css( 'background-color', Crosser.colors[lk % Crosser.colors.length] );
+							}
+							Crosser.draw_crossword();
+						} );
+
+						word.append( loc );
+					}
+					
+					word_list.append( word );
+				}
+				
+				$( '#word-list-holder' ).append( word_list );
+			},
+			
+			draw_crossword: function() {
+				$( '#crossword-holder' ).empty();
+				var width = $( '#width' ).val()-0;
+				var offset = $( '#offset' ).val()-0;
+				
+				var canvas = $( '<canvas id="lines" width="2000" height="2000">' );
+				$( '#crossword-holder' ).append( canvas );
+				
+				if ( width > 0 ) {
+					var cw = $( '<ul id="crossword">' );
+	
+					var blob = '<li>';	
+	
+					var specials = this.find_special_characters( width, offset );
+					var sc = 0;
+					var cursor = offset;
+					while ( sc < specials.length && cursor < this.content.length ) {
+						var next = specials[sc][0];
+						
+						if ( next >= cursor ) {
+							blob += this.content.substr( cursor, next - cursor );
+							cursor = next;
+							
+							var lk = specials[sc][1];
+							if ( lk == -1 ) {
+								blob += '</li><li>';
+								
+								if ( specials.length > sc + 1 ) {
+									if ( specials[sc + 1][0] == next ) {
+										sc++;
+										lk = specials[sc][1];
+									}
+								}
+							}
+							
+							if ( lk > -1 ) {							
+								var letter = this.content.substr( next, 1 );
+								blob += '<span class="hilit" style="color:' + this.colors[lk % this.colors.length] + '">';
+								blob += letter;
+								
+								var tracer = sc;
+								do {
+									var id = specials[tracer][2];
+									var ids = id ? 'id="' + id + '" data-color="' + this.colors[specials[tracer][1] % this.colors.length] + '"' : '';
+									blob += '<div class="popout" style="border-color:' + this.colors[specials[tracer][1] % this.colors.length] + '" ' + ids + '>' + letter + '</div>';
+									tracer++;
+								} while ( specials[tracer][0] == next );
+
+								blob += '</span>';
+								
+								cursor++;
+							}
+						}
+						
+						sc++;
+					}
+					
+					blob += this.content.substr( cursor );
+					blob += '</li>';
+					
+					cw.html( blob );
+					$( '#crossword-holder' ).append( cw );
+				}
+				
+				//	Draw lines.
+				context = document.getElementById( 'lines' ).getContext( '2d' );
+				for ( var lk in this.selected ) {
+					var start = $( '#s' + lk ).offset();
+					var end = $( '#e' + lk ).offset();
+					var color = $( '#e' + lk ).data( 'color' );
+					
+					context.beginPath();
+      				context.moveTo(start.left - 220 + 8, start.top - 40 + 8);
+      				context.lineTo(end.left - 220 + 8, end.top - 40 + 8);
+      				context.lineWidth = 2;
+				
+      				// set line color
+      				context.strokeStyle = color;
+      				context.stroke();
+				}
+			},
+			
+			find_special_characters: function( width, offset ) {
+				var sc = [];
+				
+				for ( var i = width + offset; i < this.content.length; i += width ) {
+					sc.push( [ i, -1 ] );
+				}
+				
+				var i = 0;
+				for ( var lk in this.selected ) {
+					var loc = this.selected[lk];
+					var pos = loc[0];
+					var step = loc[1];
+					var length = loc[2];
+					var c = i++;					
+					
+					while ( length > 0 ) {
+						var x = [ pos, c ];
+						if ( length == loc[2] )
+							x.push( 's' + lk );
+						else if ( length == 1 )
+							x.push( 'e' + lk );
+						sc.push( x );
+						
+						pos += step;
+						length--;
+					}
+				}
+				
+				return sc.sort( function( a, b ) { if ( a[0] != b[0] ) return a[0] - b[0]; return a[1] - b[1]; } );
+			},
+			
+			content: '[content]',
+			words: { [words] },
+		};
+
+		$( document ).ready( function() {
+			Crosser.init();
+		} );
+	</script>
+</html>
