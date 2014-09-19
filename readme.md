@@ -10,6 +10,10 @@ If your go environment is properly set up, you can get it with:
 Then to run it: 
 
 	$GOPATH/bin/code-finder <file to process>
+
+If you would like to add custom words to the dictionary (by default, it just uses a standard dict file):
+	
+	vim $GOPATH/src/github.com/thingalon/code-finder/dictionary.txt
 	
 It will output an html doc that you can then open to browse the results. You can set your crossword width, offset in the source document, and click on words to hilight them.
 
