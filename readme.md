@@ -11,10 +11,13 @@ Then to run it:
 
 	$GOPATH/bin/code-finder <file to process>
 
+It will output an html doc that you can then open to browse the results. You can set your crossword width, offset in the source document, and click on words to hilight them.
+
 If you would like to add custom words to the dictionary (by default, it just uses a standard dict file):
 	
 	vim $GOPATH/src/github.com/thingalon/code-finder/dictionary.txt
 	
-It will output an html doc that you can then open to browse the results. You can set your crossword width, offset in the source document, and click on words to hilight them.
+Warning
+-------
 
-Known bug: If you select a word that wraps around the edges of the crossword, the line drawn for the word will be wrong. Only words that fit in your current crossword width will look correct.
+This was hastily written for a presentation, and is extremely hacky. It probably contains a whole bunch of bugs. One known bug: If you select a word that wraps around the edges of the crossword, the line drawn for the word will be wrong. Only words that fit in your current crossword width will look correct.
